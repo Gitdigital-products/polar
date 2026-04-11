@@ -3,6 +3,22 @@ import { NextResponse } from 'next/server'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 
+const ALLOWED_EXACT_HOSTNAMES = new Set<string>([
+  // Add explicitly trusted domains here.
+  // Example: 'example.com',
+])
+
+const ALLOWED_HOSTNAME_SUFFIXES = [
+  // Add trusted domain suffixes here (must include leading dot).
+  // Example: '.example.com',
+]
+
+function isAllowedHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase()
+  if (ALLOWED_EXACT_HOSTNAMES.has(normalized)) return true
+  return ALLOWED_HOSTNAME_SUFFIXES.some((suffix) => normalized.endsWith(suffix))
+}
+
 interface ValidateURLRequest {
   url: string
 }
@@ -55,6 +71,10 @@ async function validateOutboundURL(rawUrl: string): Promise<URL> {
 
   if (parsedURL.username || parsedURL.password) {
     throw new Error('URL must not contain credentials')
+  }
+
+  if (!isAllowedHostname(parsedURL.hostname)) {
+    throw new Error('URL host is not allowed')
   }
 
   const records = await lookup(parsedURL.hostname, { all: true })
